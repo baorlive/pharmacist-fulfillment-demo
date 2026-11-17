@@ -32,7 +32,7 @@ Individual gates:
 - `npm run qg:regression` — production feedback regressions (`REG-*`)
 - `npm run build` — production Next.js build
 
-GitHub Actions (`.github/workflows/quality-gates.yml`) runs `npm run qg` and `npm audit --audit-level=high` on every PR and push to `main`, failing the pipeline if any required check fails.
+GitHub Actions (`.github/workflows/quality-gates.yml`) runs `npm run qg` (failing the pipeline if any required gate fails) and runs an advisory `npm audit --audit-level=high` scan on every PR and push to `main`.
 
 ## 3. Drive Agent Self-Correction
 

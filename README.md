@@ -8,26 +8,28 @@
   <a href="https://rxflow-orders.vercel.app/"><strong>Live Preview</strong></a>
 </p>
 
-Pharmacist Fulfillment is a Next.js pharmacy-order operations demo. Inside the UI it is branded as **RxFlow Orders**: a dense split-pane dashboard for receiving, reviewing, packing, and dispatching medication orders with strong visual hierarchy and a token-driven design system.
+Pharmacist Fulfillment is a Next.js 14 pharmacy-order operations demo. Inside the UI it is branded as **RxFlow Orders**: a dense split-pane dashboard for receiving, verifying, packing, and dispatching medication orders with a strict token-driven design system and automated Quality Gates.
 
 ## Highlights
 
-- Split view layout with an order list on the left and a workflow detail panel on the right
-- Incoming-order simulation loop that creates new demo orders from seeded templates
-- Barcode packing modal that simulates randomized scan order before an order can move to pickup or delivery
-- Payment-verification lock, delivery countdowns, and delivered-hold auto-completion timers
-- Three-layer design-token pipeline authored in TypeScript and rendered to generated CSS variables
-- Standalone design catalog in [`dashboard-design-system.html`](dashboard-design-system.html)
+- Split-view workbench with an order queue (`ListPanel`) on the left and a tabbed workflow detail view (`DetailPanel`) on the right
+- 9 seeded demo orders in [`src/lib/data.ts`](src/lib/data.ts) plus an incoming-order simulation loop cloning templates from `RX-001`, `RX-002`, and `RX-008`
+- Randomized barcode packing modal ([`src/components/modals/BarcodePopup.tsx`](src/components/modals/BarcodePopup.tsx)) with item expiry gating before an order can move to pickup or delivery
+- Payment-verification lock (`10s`), courier transit countdown (`30s`), and delivered-hold auto-completion (`30m`) timers
+- App Router API routes for service health/telemetry ([`src/app/api/health/route.ts`](src/app/api/health/route.ts)) and transition validation ([`src/app/api/orders/validate/route.ts`](src/app/api/orders/validate/route.ts))
+- Strict three-layer design-token pipeline authored in TypeScript and rendered to generated CSS variables
+- Automated Quality Gates pipeline (`npm run qg`) covering token/UX rules, TypeScript, business-rule/API/regression tests, static security scans, and production build
 
 ## Stack
 
-- Next.js 14 App Router
-- React 18
-- TypeScript
+- Next.js 14 App Router & React 18
+- TypeScript (`strict` mode)
 - Local `useReducer` store in [`src/store/orderStore.ts`](src/store/orderStore.ts)
 - CSS custom properties generated from token maps in [`src/lib/tokens`](src/lib/tokens)
-- Vercel Analytics (and optional env-gated Microsoft Clarity via `NEXT_PUBLIC_CLARITY_ID`) in [`src/app/layout.tsx`](src/app/layout.tsx)
-- Automated Quality Gates pipeline in [`scripts/`](scripts), [`tests/`](tests), and [`.github/workflows/quality-gates.yml`](.github/workflows/quality-gates.yml)
+- Security headers (`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `poweredByHeader: false`) in [`next.config.js`](next.config.js)
+- Vercel Analytics and optional env-gated Microsoft Clarity (`NEXT_PUBLIC_CLARITY_ID`) in [`src/app/layout.tsx`](src/app/layout.tsx)
+- PII-free runtime invariant telemetry (`NEXT_PUBLIC_TELEMETRY_ENDPOINT`) in [`src/lib/telemetry.ts`](src/lib/telemetry.ts)
+- CI & Quality Gates in [`scripts/`](scripts), [`tests/`](tests), and [`.github/workflows/quality-gates.yml`](.github/workflows/quality-gates.yml)
 
 ## Project Structure
 
@@ -40,13 +42,12 @@ Pharmacist Fulfillment is a Next.js pharmacy-order operations demo. Inside the U
 │   ├── pull_request_template.md
 │   └── workflows/quality-gates.yml
 ├── AGENTS.md                      # Architecture, UI design-system rules, and Quality Gate guide
-├── CLAUDE.md
 ├── LICENSE.md
-├── catalog-sync.md                # Notes for keeping catalog and app aligned
-├── dashboard-design-system.html   # Standalone design catalog / specimen library
+├── catalog-sync.md                # Selector-sync checklist for token/catalog workflows
 ├── docs/
 │   ├── barcode-scanning-ux-pattern.md
 │   └── quality-gates.md
+├── next.config.js
 ├── public/
 │   ├── getnow.svg
 │   └── readme/
@@ -58,7 +59,9 @@ Pharmacist Fulfillment is a Next.js pharmacy-order operations demo. Inside the U
 │   └── ts-loader.cjs
 ├── src/
 │   ├── app/
-│   │   ├── api/                   # /api/health and /api/orders/validate routes
+│   │   ├── api/
+│   │   │   ├── health/route.ts
+│   │   │   └── orders/validate/route.ts
 │   │   ├── layout.tsx
 │   │   ├── page.tsx
 │   │   ├── globals.css
@@ -72,38 +75,34 @@ Pharmacist Fulfillment is a Next.js pharmacy-order operations demo. Inside the U
 │   │   └── ui/
 │   ├── lib/
 │   │   ├── data.ts
+│   │   ├── generateTokenCss.ts
 │   │   ├── telemetry.ts
 │   │   ├── types.ts
 │   │   ├── utils.ts
 │   │   └── tokens/
 │   └── store/
 │       └── orderStore.ts
-└── tests/                         # Business-rule, UX-spec, API, and regression suites
+└── tests/
+    ├── api-integration.test.ts
+    ├── business-rules.test.ts
+    ├── regressions.test.ts
+    └── ux-specs.test.ts
 ```
 
 ## Runtime Architecture
 
-The app renders a single dashboard page from [`src/app/page.tsx`](src/app/page.tsx), which mounts [`src/components/Dashboard.tsx`](src/components/Dashboard.tsx). `Dashboard` owns the app-level side effects:
+The app renders a single page from [`src/app/page.tsx`](src/app/page.tsx), which mounts [`src/components/Dashboard.tsx`](src/components/Dashboard.tsx). `Dashboard` owns the app-level side effects:
 
-- a 1-second reducer tick for delivery and completion timers
-- a repeating incoming-order demo loop
-- the barcode scanning demo loop
+- a 1-second `TICK_TIMERS` interval for delivery, hold, and verification countdowns
+- the repeating incoming-order demo loop (toggled from `Topbar`)
+- the simulated barcode scan loop (`START_BARCODE_SCAN` / `COMPLETE_BARCODE_SCAN`)
 - toast enter/leave timing
 
-Application state lives in [`src/store/orderStore.ts`](src/store/orderStore.ts). The reducer manages:
-
-- order data and selection state
-- filter/search state
-- message sending
-- reject/cancel flows
-- prescription preview state
-- incoming-order popup state
-- barcode scanning state
-- main action locks and payment verification locks
+Application state lives in [`src/store/orderStore.ts`](src/store/orderStore.ts) via `useAppStore()` (`initialState`, `reducer`). It manages orders, selection, filters/search, buyer-pharmacy messaging, reject/cancel confirmation, prescription preview, incoming-order popups, barcode scan state, and action locks (`VERIFY_PAY_LOCK_MS`, `MAIN_ACTION_LOCK_MS`). Invalid transitions and missing-entity/expiry blocks emit PII-free events via `reportInvariantViolation()` in [`src/lib/telemetry.ts`](src/lib/telemetry.ts).
 
 ## Order Workflow
 
-The UI models a linear fulfillment flow, but a few steps are implemented as reducer state plus modal side effects rather than direct button-to-status transitions:
+Order state is normalized via `normalizeOrderFlow()`, `canonicalPhase()`, and `canonicalActionType()` in [`src/lib/utils.ts`](src/lib/utils.ts):
 
 ```text
 verify-pay -> accept -> review -> preparing -> ready -> deliver/handoff
@@ -111,33 +110,40 @@ deliver -> transit -> delivered-hold -> done
 handoff -> delivered-hold -> done
 ```
 
-Important behavior details:
+Key workflow rules:
 
-- `verify-pay` is locked for 10 seconds before the unpaid order can be confirmed.
-- `accept` opens the barcode workflow and moves the order into the passive `review` state.
-- `review` is not a manual action; the barcode modal drives the order forward.
-- Once all items are scanned and confirmed, the order becomes `ready` and switches to `deliver` for courier orders or `handoff` for pickup orders.
-- Courier deliveries auto-transition from `transit` to `delivered-hold` after 30 seconds.
-- Delivered orders auto-transition to `completed` / `done` after 30 minutes if no issue is reported.
-- The `complete` action type exists in the type/config surface, but the current reducer flow auto-completes delivered orders instead of exposing a separate manual complete button.
+- `verify-pay` is locked for `10s` (`VERIFY_PAY_LOCK_MS`) before an unpaid order can be confirmed.
+- `accept` opens the barcode packing modal and places the order in the passive `review` action until scanning runs or closes.
+- Confirming a full barcode scan sets the order to `ready` (`deliver` for `courier`, `handoff` for `pickup`), gated on all items having an expiry date (`isExpiryFulfilledForReady`).
+- Courier deliveries auto-transition from `transit` (`delivering`) to `delivered-hold` after `30s` (`DELIVERING_ETA_MS`).
+- Delivered orders auto-complete to `completed` / `done` after `30m` (`COMPLETE_AUTO_MS`) if no issue is reported.
+- Rapid repeated `accept` / `handoff` / `deliver` actions within `1.5s` (`MAIN_ACTION_LOCK_MS`) are ignored.
+- Legacy `cod` orders normalize to `paid` (`VNPay`), and `rxStatus === 'rejected'` normalizes to terminal `completed` / `done`.
+
+## API Routes
+
+- `GET /api/health` ([`src/app/api/health/route.ts`](src/app/api/health/route.ts)): returns service status (`ok`), `seedOrders` count, and `recentViolationsCount` from the telemetry buffer.
+- `POST /api/orders/validate` ([`src/app/api/orders/validate/route.ts`](src/app/api/orders/validate/route.ts)): validates transition requests (`verify-pay`, `accept`, `ready`, `deliver`, `handoff`, `reject`, `cancel`) against workflow invariants, lock windows, expiry requirements, and reject reasons.
 
 ## Design System
 
-The styling model is built on a strict three-layer token pipeline:
+The styling model uses a strict three-layer token pipeline:
 
 ```text
-foundation.ts -> semantic.ts -> component.ts -> generateTokenCss.ts
--> scripts/render-token-css.cjs -> src/app/tokens/*.css -> src/app/globals.css
+src/lib/tokens/foundation.ts (--f-*)
+  -> src/lib/tokens/semantic.ts (--s-*)
+  -> src/lib/tokens/component.ts (--c-*)
+  -> src/lib/generateTokenCss.ts
+  -> scripts/render-token-css.cjs
+  -> src/app/tokens/{foundation,semantic,component}.css
+  -> src/app/globals.css
 ```
 
-Rules enforced by the repo guidance:
+Enforced by [`scripts/qg-design-system.cjs`](scripts/qg-design-system.cjs) and [`tests/ux-specs.test.ts`](tests/ux-specs.test.ts):
 
-- raw values belong in `foundation.ts`
-- semantic aliases must reference `--f-*`
-- component-scoped tokens must reference `--s-*` or `--f-*`
-- component CSS in [`src/app/globals.css`](src/app/globals.css) should consume `--s-*` and `--c-*`, not raw values
-
-The standalone catalog at [`dashboard-design-system.html`](dashboard-design-system.html) mirrors the app tokens and component patterns. Use [`catalog-sync.md`](catalog-sync.md) when syncing changes between the app and catalog.
+- **Square surfaces only**: no visible `border-radius` except `.logo-dot`.
+- **Two fonts only**: `Plus Jakarta Sans` (`--s-font-sans`) for UI text and `DM Sans` (`--s-font-numeric`) for numbers, IDs, prices, and timestamps.
+- **Strict layer boundaries**: `globals.css` consumes only `--s-*` and `--c-*` (never `--f-*`), and generated files in `src/app/tokens/` must match TypeScript token sources byte-for-byte.
 
 ## Local Development
 
@@ -148,7 +154,37 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+Optional environment variables (see [`.env.example`](.env.example)):
+
+- `NEXT_PUBLIC_CLARITY_ID`: enables Microsoft Clarity script injection via `next/script` in [`src/app/layout.tsx`](src/app/layout.tsx).
+- `NEXT_PUBLIC_TELEMETRY_ENDPOINT`: optional beacon URL for `reportInvariantViolation()` in [`src/lib/telemetry.ts`](src/lib/telemetry.ts).
+
 Production preview: [https://rxflow-orders.vercel.app/](https://rxflow-orders.vercel.app/)
+
+## Scripts
+
+- `npm run tokens:css` — regenerates `src/app/tokens/foundation.css`, `semantic.css`, and `component.css`
+- `npm run dev` — regenerates token CSS and starts the Next.js dev server
+- `npm run build` — regenerates token CSS and runs the production build
+- `npm run start` — regenerates token CSS and starts the production server
+- `npm run qg` — runs the full Automated Quality Gates pipeline (writes `.qg-report.json`)
+- `npm run qg:tokens` — verifies token CSS sync, layer boundaries, square surfaces, and font rules (`UX-01..UX-05`)
+- `npm run qg:typecheck` — runs `tsc --noEmit`
+- `npm run qg:unit` — runs [`tests/business-rules.test.ts`](tests/business-rules.test.ts) (`BR-01..BR-09`) and [`tests/ux-specs.test.ts`](tests/ux-specs.test.ts) (`UX-01..UX-05`)
+- `npm run qg:api` — runs [`tests/api-integration.test.ts`](tests/api-integration.test.ts) (`API-01..API-07`)
+- `npm run qg:security` — runs [`scripts/qg-security.cjs`](scripts/qg-security.cjs) (`SEC-01..SEC-05`)
+- `npm run qg:regression` — runs [`tests/regressions.test.ts`](tests/regressions.test.ts) (`REG-001..REG-005`)
+- `npm run qg:risk` — classifies changed files for high-risk domain sign-off
+- `npm run qg:new-regression -- --id REG-XXX --title "..."` — scaffolds a new regression test entry
+
+## Verification & Quality Gates
+
+```bash
+npm run qg
+npm run qg:risk
+```
+
+See [`docs/quality-gates.md`](docs/quality-gates.md) for the full specification matrix, agent self-correction loop, and high-risk stage gates.
 
 ## License
 
@@ -159,35 +195,9 @@ This template is licensed for **personal use only**.
 
 See [`LICENSE.md`](LICENSE.md) for the full terms.
 
-## Scripts
-
-- `npm run tokens:css` regenerates `src/app/tokens/foundation.css`, `semantic.css`, and `component.css`
-- `npm run dev` runs the Next.js dev server and regenerates token CSS first
-- `npm run build` regenerates token CSS and runs a production build
-- `npm run start` regenerates token CSS and starts the production server
-- `npm run qg` runs the full Automated Quality Gates pipeline
-- `npm run qg:risk` classifies changed files for high-risk human sign-off requirements
-- `npm run qg:new-regression -- --id REG-XXX --title "..."` scaffolds a regression gate from an incident
-
-## Verification & Quality Gates
-
-The repository includes an automated Quality Gates system covering UX/business-rule specs, type checking, API integration tests, static security scans, production feedback regressions, and high-risk human sign-off checks.
-
-```bash
-npm run qg       # Full Quality Gate pipeline (tokens, tsc, unit/specs, API, security, regressions, build)
-npm run qg:risk  # Classify staged/uncommitted changes for high-risk human sign-off
-```
-
-See [`docs/quality-gates.md`](docs/quality-gates.md) for the full verification matrix, agent self-correction loop, and high-risk stage gates.
-
-For design-sensitive work, also preview:
-
-- the app in the browser
-- the standalone catalog at [`dashboard-design-system.html`](dashboard-design-system.html)
-
 ## Reference Docs
 
 - [`AGENTS.md`](AGENTS.md): architecture, UI design-system rules, and Quality Gate guide
-- [`catalog-sync.md`](catalog-sync.md): app-to-catalog sync workflow
 - [`docs/quality-gates.md`](docs/quality-gates.md): automated Quality Gates specification, risk stage gates, and regression loop
+- [`catalog-sync.md`](catalog-sync.md): selector-sync workflow notes
 - [`docs/barcode-scanning-ux-pattern.md`](docs/barcode-scanning-ux-pattern.md): notes on previous barcode interaction patterns
