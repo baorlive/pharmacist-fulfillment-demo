@@ -1,0 +1,35 @@
+{
+  "name": "rxflow-orders",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "tokens:css": "node scripts/render-token-css.cjs",
+    "predev": "npm run tokens:css",
+    "dev": "next dev",
+    "prebuild": "npm run tokens:css",
+    "build": "next build",
+    "prestart": "npm run tokens:css",
+    "start": "next start",
+    "qg": "node scripts/qg-runner.cjs",
+    "qg:tokens": "node scripts/qg-design-system.cjs",
+    "qg:typecheck": "tsc --noEmit",
+    "qg:unit": "node scripts/run-tests.cjs tests/business-rules.test.ts tests/ux-specs.test.ts",
+    "qg:api": "node scripts/run-tests.cjs tests/api-integration.test.ts",
+    "qg:security": "node scripts/qg-security.cjs",
+    "qg:regression": "node scripts/run-tests.cjs tests/regressions.test.ts",
+    "qg:risk": "node scripts/qg-risk-gate.cjs",
+    "qg:new-regression": "node scripts/new-regression.cjs"
+  },
+  "dependencies": {
+    "@vercel/analytics": "^2.0.1",
+    "next": "14.2.5",
+    "react": "^18",
+    "react-dom": "^18"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "typescript": "^5"
+  }
+}

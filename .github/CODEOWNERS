@@ -1,0 +1,15 @@
+# High-risk domain owner for sign-off before merge
+
+# Payment logic & order fulfillment state machine
+/src/store/orderStore.ts          @baorlive
+/src/lib/utils.ts                 @baorlive
+/src/app/api/orders/validate/     @baorlive
+
+# Security configuration, telemetry & quality gate integrity
+/next.config.js                   @baorlive
+/src/app/layout.tsx               @baorlive
+/src/lib/telemetry.ts             @baorlive
+/.github/                         @baorlive
+/scripts/                         @baorlive
+/package.json                     @baorlive
+/package-lock.json                @baorlive

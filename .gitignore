@@ -1,0 +1,15 @@
+.vercel
+.DS_Store
+node_modules/
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+*.log
+.qg-report.json
+coverage/
+test-results/

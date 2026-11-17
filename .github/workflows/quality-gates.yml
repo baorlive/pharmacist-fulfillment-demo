@@ -1,0 +1,78 @@
+name: Automated Quality Gates
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality-gates:
+    name: Continuous Verification Pipeline
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run full Automated Quality Gates
+        run: npm run qg
+
+      - name: Dependency vulnerability scan
+        run: npm audit --audit-level=high
+
+      - name: Publish Quality Gate summary for agent self-correction
+        if: always()
+        run: |
+          if [ -f .qg-report.json ]; then
+            echo "## Quality Gate Report" >> "$GITHUB_STEP_SUMMARY"
+            node -e '
+              const r = require("./.qg-report.json");
+              console.log("Overall:", r.overallStatus.toUpperCase());
+              for (const g of r.gates) {
+                console.log(`- **${g.id}** (${g.label}): ${g.status} (${g.durationMs}ms)${g.remediation ? " -> " + g.remediation : ""}`);
+              }
+            ' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload Quality Gate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qg-report
+          path: .qg-report.json
+          if-no-files-found: ignore
+
+  risk-assessment:
+    name: High-Risk Change Stage Gate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    outputs:
+      risk_level: ${{ steps.classify.outputs.risk_level }}
+      requires_human_signoff: ${{ steps.classify.outputs.requires_human_signoff }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Classify high-risk changes
+        id: classify
+        run: |
+          node scripts/qg-risk-gate.cjs --base "origin/${{ github.base_ref }}" | tee -a "$GITHUB_STEP_SUMMARY"

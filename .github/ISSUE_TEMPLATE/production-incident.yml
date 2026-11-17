@@ -1,0 +1,28 @@
+name: Production Incident -> Quality Gate Regression
+description: Capture a production failure or telemetry invariant violation and convert it into an automated Quality Gate.
+title: "[Incident] "
+labels: ["production-incident", "quality-gate"]
+body:
+  - type: input
+    id: telemetry_code
+    attributes:
+      label: Telemetry / Invariant Code
+      description: Code from /api/health or src/lib/telemetry.ts (e.g. VERIFY_PAY_LOCK_BLOCKED, EXPIRY_GATE_BLOCKED)
+      placeholder: EXPIRY_GATE_BLOCKED
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Production Behavior & Root Cause
+      description: Describe what happened in production and which business rule or UX spec was violated.
+    validations:
+      required: true
+  - type: input
+    id: regression_id
+    attributes:
+      label: Target Regression Gate ID
+      description: Run `npm run qg:new-regression -- --id REG-XXX --title "..."` to scaffold the regression test.
+      placeholder: REG-006
+    validations:
+      required: true
